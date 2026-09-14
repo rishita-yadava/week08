@@ -9,6 +9,7 @@ from app.db import Base, engine
 from app.routers import students
 from app.storage import ensure_container_exists
 
+# Triggering CI pipeline - SIT722 8.1P demonstration
 
 logging.basicConfig(
     level=logging.INFO,
