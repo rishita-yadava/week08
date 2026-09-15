@@ -20,6 +20,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Sanitize image tag
+        run: |
+          CLEAN_TAG=$(echo "${{ inputs.image_tag }}" | xargs)
+          echo "IMAGE_TAG=$CLEAN_TAG" >> $GITHUB_ENV
+
       - name: Login to Azure
         uses: azure/login@v3
         with:
@@ -69,37 +74,37 @@ jobs:
       - name: Update frontend image
         run: |
           kubectl set image deployment/frontend \
-            frontend=${{ vars.ACR_LOGIN_SERVER }}/koalatech-frontend:${{ inputs.image_tag }} \
+            frontend=${{ vars.ACR_LOGIN_SERVER }}/koalatech-frontend:${{ env.IMAGE_TAG }} \
             -n production
 
       - name: Update user-service image
         run: |
           kubectl set image deployment/user-service \
-            user-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-user-service:${{ inputs.image_tag }} \
+            user-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-user-service:${{ env.IMAGE_TAG }} \
             -n production
 
       - name: Update student-service image
         run: |
           kubectl set image deployment/student-service \
-            student-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-student-service:${{ inputs.image_tag }} \
+            student-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-student-service:${{ env.IMAGE_TAG }} \
             -n production
 
       - name: Update lecturer-service image
         run: |
           kubectl set image deployment/lecturer-service \
-            lecturer-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-lecturer-service:${{ inputs.image_tag }} \
+            lecturer-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-lecturer-service:${{ env.IMAGE_TAG }} \
             -n production
 
       - name: Update course-service image
         run: |
           kubectl set image deployment/course-service \
-            course-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-course-service:${{ inputs.image_tag }} \
+            course-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-course-service:${{ env.IMAGE_TAG }} \
             -n production
 
       - name: Update enrollment-service image
         run: |
           kubectl set image deployment/enrollment-service \
-            enrollment-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-enrollment-service:${{ inputs.image_tag }} \
+            enrollment-service=${{ vars.ACR_LOGIN_SERVER }}/koalatech-enrollment-service:${{ env.IMAGE_TAG }} \
             -n production
 
       - name: Wait for frontend rollout
