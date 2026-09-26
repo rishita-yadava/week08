@@ -5,6 +5,13 @@ terraform {
       version = "~> 3.0"
     }
   }
+
+  backend "azurerm" {
+    resource_group_name  = "koalatech-tfstate-rg"
+    storage_account_name = "koalatechtfstaterish"
+    container_name       = "tfstate"
+    key                  = "week08.terraform.tfstate"
+  }
 }
 
 provider "azurerm" {
@@ -25,11 +32,11 @@ resource "azurerm_container_registry" "acr" {
 }
 
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                 = "koalatech-week08-aks"
-  location             = azurerm_resource_group.rg.location
-  resource_group_name  = azurerm_resource_group.rg.name
-  dns_prefix           = "koalatechweek08"
-  oidc_issuer_enabled  = true
+  name                = "koalatech-week08-aks"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  dns_prefix          = "koalatechweek08"
+  oidc_issuer_enabled = true
 
   default_node_pool {
     name       = "default"
@@ -45,7 +52,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
 resource "azurerm_role_assignment" "aks_acr_pull" {
   principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
   role_definition_name             = "AcrPull"
-  scope                             = azurerm_container_registry.acr.id
+  scope                            = azurerm_container_registry.acr.id
   skip_service_principal_aad_check = true
 }
 
