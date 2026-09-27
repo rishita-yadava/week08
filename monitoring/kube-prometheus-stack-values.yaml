@@ -1,0 +1,34 @@
+# Settings for the kube-prometheus-stack Helm chart
+# (Prometheus, Grafana, node-exporter, kube-state-metrics)
+
+# Alerting is out of scope for this task, so Alertmanager is disabled to save resources
+alertmanager:
+  enabled: false
+
+grafana:
+  # Kubernetes dashboards that come with the chart
+  defaultDashboardsEnabled: true
+  # Grafana is kept internal to the cluster and accessed via kubectl port-forward,
+  # so it is not exposed to the internet.
+  # The admin password is supplied at install time from a secret, not stored here.
+  service:
+    type: ClusterIP
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    # Let Prometheus pick up ServiceMonitors from any namespace,
+    # not only those created by this Helm release
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+
+# AKS manages these control plane components itself, so Prometheus cannot
+# scrape them. Disabling them avoids permanently "down" targets.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false

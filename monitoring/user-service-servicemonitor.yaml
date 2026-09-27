@@ -1,0 +1,21 @@
+# Tells Prometheus to scrape /metrics from user-service
+# in both the staging and production namespaces
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: user-service
+  namespace: monitoring
+  labels:
+    app: user-service
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+      - staging
+  selector:
+    matchLabels:
+      app: user-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

@@ -166,3 +166,13 @@ jobs:
           kubectl get pods -n production
           kubectl get services -n production
           kubectl get pvc -n production
+          
+  # =========================================================
+  # Monitoring: deploy and validate Prometheus and Grafana
+  # after production has been updated successfully
+  # =========================================================
+  monitoring:
+    name: Monitoring
+    needs: deploy-production
+    uses: ./.github/workflows/05-monitoring.yml
+    secrets: inherit
