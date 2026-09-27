@@ -62,9 +62,12 @@ jobs:
             --wait \
             --timeout 10m
 
-      - name: Apply user-service ServiceMonitor
+      # The ServiceMonitor tells Prometheus to scrape user-service, and the
+      # dashboard ConfigMap is loaded into Grafana automatically (dashboards as code)
+      - name: Apply user-service ServiceMonitor and Grafana dashboard
         run: |
           kubectl apply -f monitoring/user-service-servicemonitor.yaml
+          kubectl apply -f monitoring/user-service-dashboard.yaml
 
       - name: Wait for Prometheus and Grafana to be ready
         run: |

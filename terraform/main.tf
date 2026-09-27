@@ -47,6 +47,13 @@ resource "azurerm_kubernetes_cluster" "aks" {
   identity {
     type = "SystemAssigned"
   }
+
+  # Azure adds default node pool upgrade settings after creation.
+  # Ignoring them stops Terraform from reporting drift and
+  # modifying the cluster on every pipeline run.
+  lifecycle {
+    ignore_changes = [default_node_pool[0].upgrade_settings]
+  }
 }
 
 resource "azurerm_role_assignment" "aks_acr_pull" {

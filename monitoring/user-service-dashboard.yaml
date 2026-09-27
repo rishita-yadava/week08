@@ -1,0 +1,198 @@
+# Grafana dashboard for user-service, loaded automatically by the Grafana
+# sidecar because of the grafana_dashboard: "1" label.
+# Requests to /metrics (Prometheus's own scrapes) are excluded so the
+# dashboard reflects real user traffic only.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  user-service-dashboard.json: |-
+    {
+      "title": "KoalaTech User Service",
+      "uid": "koalatech-user-service",
+      "timezone": "browser",
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "time": { "from": "now-30m", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "label": "Environment",
+            "type": "custom",
+            "query": "production,staging",
+            "current": { "text": "production", "value": "production" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Service Status",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(up{service=\"user-service\", namespace=\"$namespace\"})"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "DOWN" }, "1": { "text": "UP" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "type": "stat",
+          "title": "Total Requests (selected time range)",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(http_requests_total{service=\"user-service\", namespace=\"$namespace\", handler!=\"/metrics\"}[$__range]))"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "type": "stat",
+          "title": "Error Rate (4xx and 5xx)",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "100 * sum(increase(http_requests_total{service=\"user-service\", namespace=\"$namespace\", handler!=\"/metrics\", status=~\"[45]xx\"}[$__range])) / sum(increase(http_requests_total{service=\"user-service\", namespace=\"$namespace\", handler!=\"/metrics\"}[$__range]))"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 5 },
+                  { "color": "red", "value": 20 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "type": "stat",
+          "title": "95th Percentile Response Time",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_highr_seconds_bucket{service=\"user-service\", namespace=\"$namespace\", handler!=\"/metrics\"}[$__range])))"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "type": "timeseries",
+          "title": "Request Rate by Status Code",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (status) (rate(http_requests_total{service=\"user-service\", namespace=\"$namespace\", handler!=\"/metrics\"}[1m]))",
+              "legendFormat": "{{status}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+        },
+        {
+          "type": "timeseries",
+          "title": "Request Rate by Endpoint",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (method, handler) (rate(http_requests_total{service=\"user-service\", namespace=\"$namespace\", handler!=\"/metrics\"}[1m]))",
+              "legendFormat": "{{method}} {{handler}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+        },
+        {
+          "type": "timeseries",
+          "title": "Response Time (p50 and p95)",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 0, "y": 12, "w": 8, "h": 8 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_highr_seconds_bucket{service=\"user-service\", namespace=\"$namespace\", handler!=\"/metrics\"}[5m])))",
+              "legendFormat": "p50"
+            },
+            {
+              "refId": "B",
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_highr_seconds_bucket{service=\"user-service\", namespace=\"$namespace\", handler!=\"/metrics\"}[5m])))",
+              "legendFormat": "p95"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+        },
+        {
+          "type": "timeseries",
+          "title": "Pod CPU Usage",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 8, "y": 12, "w": 8, "h": 8 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container=\"user-service\"}[5m]))",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "cores" }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+        },
+        {
+          "type": "timeseries",
+          "title": "Pod Memory Usage",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "x": 16, "y": 12, "w": 8, "h": 8 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", container=\"user-service\"})",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+        }
+      ]
+    }
