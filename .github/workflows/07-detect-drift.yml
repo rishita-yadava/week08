@@ -1,0 +1,100 @@
+name: Detect Infrastructure Drift
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  detect-drift:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Run terraform plan
+        id: tfplan
+        run: |
+          cd terraform
+          terraform init
+          terraform plan -json > plan.json
+          echo "Plan completed"
+
+      - name: Parse drift detection
+        id: drift
+        run: |
+          cd terraform
+          DRIFT_FOUND=$(cat plan.json | jq '[.resource_changes[] | select(.change.actions != ["no-op"])]' -c)
+          DRIFT_COUNT=$(echo "$DRIFT_FOUND" | jq 'length')
+          
+          echo "drift_count=$DRIFT_COUNT" >> $GITHUB_OUTPUT
+          echo "drift_details=$DRIFT_FOUND" >> $GITHUB_OUTPUT
+          
+          if (( DRIFT_COUNT > 0 )); then
+            echo "drift=true" >> $GITHUB_OUTPUT
+            echo "Drift detected: $DRIFT_COUNT resource(s) changed"
+          else
+            echo "drift=false" >> $GITHUB_OUTPUT
+            echo "No drift detected"
+          fi
+
+      - name: Post drift alert to Slack
+        if: steps.drift.outputs.drift == 'true'
+        run: |
+          DRIFT_DETAILS="${{ steps.drift.outputs.drift_details }}"
+          DRIFT_COUNT="${{ steps.drift.outputs.drift_count }}"
+          
+          PAYLOAD='{
+            "text": "Infrastructure Drift Detected",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Configuration Drift Alert*\n'"$DRIFT_COUNT"' resource(s) have changed outside Terraform"
+                }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "```'"$DRIFT_DETAILS"'```"
+                }
+              }
+            ]
+          }'
+          
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD"
+
+      - name: Post no-drift confirmation
+        if: steps.drift.outputs.drift == 'false'
+        run: |
+          PAYLOAD='{
+            "text": "Drift Check: OK",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": ":white_check_mark: No infrastructure drift detected. All resources match declared state."
+                }
+              }
+            ]
+          }'
+          
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD"
