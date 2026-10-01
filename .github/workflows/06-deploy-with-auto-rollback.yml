@@ -1,0 +1,85 @@
+name: Deploy with Auto-Rollback
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      previous-image: ${{ steps.store-image.outputs.tag }}
+    steps:
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get kubeconfig
+        run: |
+          az aks get-credentials --resource-group koalatech-week08-rg --name koalatech-week08-aks
+
+      - name: Store previous image tag
+        id: store-image
+        run: |
+          PREVIOUS_IMAGE=$(kubectl get deployment koalatech -n staging -o jsonpath='{.spec.template.spec.containers[0].image}')
+          echo "tag=$PREVIOUS_IMAGE" >> $GITHUB_OUTPUT
+          echo "Previous image: $PREVIOUS_IMAGE"
+
+      - name: Deploy new image
+        run: |
+          kubectl set image deployment/koalatech koalatech=${{ secrets.ACR_LOGIN_SERVER }}/koalatech:${{ github.sha }} -n staging
+
+      - name: Wait for deployment
+        run: kubectl rollout status deployment/koalatech -n staging --timeout=2m
+
+  monitor-deployment:
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get kubeconfig
+        run: |
+          az aks get-credentials --resource-group koalatech-week08-rg --name koalatech-week08-aks
+
+      - name: Monitor error rate
+        id: monitor
+        run: |
+          OBSERVATION_WINDOW=90
+          THRESHOLD=10
+          INTERVAL=10
+          CHECKS=$((OBSERVATION_WINDOW / INTERVAL))
+          ERROR_SPIKE_DETECTED=false
+          
+          for i in $(seq 1 $CHECKS); do
+            ERROR_COUNT=$(kubectl logs -l app=koalatech -n staging --tail=500 2>/dev/null | grep -cE "ERROR|5[0-9][0-9]" || echo 0)
+            
+            if (( ERROR_COUNT > THRESHOLD )); then
+              echo "Error spike detected at check $i: $ERROR_COUNT errors"
+              ERROR_SPIKE_DETECTED=true
+              break
+            fi
+            
+            echo "Check $i/$CHECKS: $ERROR_COUNT errors (threshold $THRESHOLD)"
+            sleep $INTERVAL
+          done
+          
+          echo "spike=$ERROR_SPIKE_DETECTED" >> $GITHUB_OUTPUT
+
+      - name: Rollback if error detected
+        if: steps.monitor.outputs.spike == 'true'
+        run: |
+          echo "ERROR SPIKE DETECTED - Rolling back to previous image"
+          kubectl set image deployment/koalatech koalatech=${{ needs.deploy.outputs.previous-image }} -n staging
+          kubectl rollout status deployment/koalatech -n staging --timeout=2m
+
+      - name: Verify app health
+        run: |
+          kubectl wait --for=condition=ready pod -l app=koalatech -n staging --timeout=60s || echo "Health check timeout (non-fatal)"
