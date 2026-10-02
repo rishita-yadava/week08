@@ -1,4 +1,5 @@
 terraform {
+  required_version = ">= 1.0"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -48,9 +49,6 @@ resource "azurerm_kubernetes_cluster" "aks" {
     type = "SystemAssigned"
   }
 
-  # Azure adds default node pool upgrade settings after creation.
-  # Ignoring them stops Terraform from reporting drift and
-  # modifying the cluster on every pipeline run.
   lifecycle {
     ignore_changes = [default_node_pool[0].upgrade_settings]
   }
