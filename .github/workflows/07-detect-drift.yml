@@ -38,7 +38,7 @@ jobs:
         id: drift
         run: |
           cd terraform
-          terraform plan -out=tfplan -input=false
+                    terraform plan -out=tfplan -input=false -lock=false
           terraform show -json tfplan > plan.json
           DRIFTED=$(jq -r '[.resource_changes[] | select(.change.actions != ["no-op"]) | .address] | join(", ")' plan.json)
           COUNT=$(jq '[.resource_changes[] | select(.change.actions != ["no-op"])] | length' plan.json)
