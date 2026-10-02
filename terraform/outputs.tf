@@ -14,6 +14,3 @@ output "aks_cluster_name" {
   value = azurerm_kubernetes_cluster.aks.name
 }
 
-output "storage_account_name" {
-  value = azurerm_storage_account.storage.name
-}
